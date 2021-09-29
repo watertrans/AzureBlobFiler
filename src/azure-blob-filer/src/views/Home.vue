@@ -1,0 +1,366 @@
+<template>
+  <div class="home">
+    <Splitter class="layout" stateKey="directorySplitter" stateStorage="local">
+      <SplitterPanel class="layout-left" :size="20">
+        <Tree class="layout-left__tree" :value="nodes" v-model:expandedKeys="expandedKeys" v-model:selectionKeys="selectionKeys" @node-select="onNodeSelect" @node-expand="onNodeSelect" selectionMode="single"></Tree>
+      </SplitterPanel>
+      <SplitterPanel class="layout-right" :size="80">
+        <Menubar class="layout-right__menu" :model="menuItems" />
+        <Breadcrumb class="layout-right__breadcrumb" :home="breadcrumbHome" :model="breadcrumbItems" />
+        <DataTable class="layout-right__table" :loading="loading" :scrollable="true" scrollHeight="calc(100vh - 250px)" :value="blobItems" :resizableColumns="true" columnResizeMode="fit" scrollDirection="both">
+          <template #empty>&nbsp;</template>
+          <Column field="name" header="Name" style="flex-basis: 400px">
+            <template #body="slotProps">
+              <span style="position: relative">
+                <img :src="getFileIcon(slotProps.data.name)" style="position: absolute; margin: -8px 0 0 -8px" />
+                <span style="margin-left: 32px">{{ getFileName(slotProps.data.name) }}</span>
+              </span>
+            </template>
+          </Column>
+          <Column field="properties.lastModified" header="LastModified" style="flex-basis: 200px">
+            <template #body="slotProps">
+              {{ convertToISO8601Local(slotProps.data.properties.lastModified) }}
+            </template>
+          </Column>
+          <Column field="properties.contentLength" header="Size" style="flex-basis: 120px" bodyStyle="justify-content: right">
+            <template #body="slotProps">
+              {{ formatBytes(slotProps.data.properties.contentLength) }}
+            </template>
+          </Column>
+          <Column field="properties.contentType" header="ContentType" style="flex-basis: 200px"></Column>
+          <Column field="properties.etag" header="ETag" style="flex-grow: 1"></Column>
+        </DataTable>
+        <textarea ref="messageRef" class="layout-right__message" v-model="messages" style="width: 100%" readonly></textarea>
+        <input ref="fileUploadInputRef" type="file" name="file" id="fileUploadInput" @change="onChangeFileUploadInput" hidden multiple />
+      </SplitterPanel>
+    </Splitter>
+  </div>
+</template>
+
+<script lang="ts">
+import { defineComponent, reactive, ref, toRefs, onMounted } from 'vue';
+import { useI18n } from 'vue-i18n';
+import { BlobItem, BlobPrefix, BlobServiceClient } from '@azure/storage-blob';
+import { TreeNode, MenuItem, StringKeyDictionary } from '@/modules/models';
+import { formatBytes, getFileIcon, getFileName, convertToISO8601, convertToISO8601Local } from '@/modules/utils';
+
+export default defineComponent({
+  name: 'Home',
+  components: {},
+  setup() {
+    const { t } = useI18n();
+    const blobSasUrl = process.env.VUE_APP_SAS_URL as string;
+    const blobServiceClient = new BlobServiceClient(blobSasUrl);
+    const containerName = '.';
+    const containerClient = blobServiceClient.getContainerClient(containerName);
+    const messageRef = ref<HTMLTextAreaElement>();
+    const fileUploadInputRef = ref<HTMLInputElement>();
+    const rootNode: TreeNode = {
+      key: '',
+      label: containerClient.containerName,
+      icon: 'pi pi-fw pi-inbox',
+      children: [] as TreeNode[],
+      data: [] as BlobItem[],
+      loaded: false,
+    };
+
+    const items = ref([
+      {
+        label: t('general.refresh'),
+        icon: 'pi pi-fw pi-refresh',
+        command: async () => {
+          await onClickRefresh();
+        },
+      },
+      {
+        label: t('general.createFolder'),
+        icon: 'pi pi-fw pi-folder',
+      },
+      {
+        label: t('general.folderUpload'),
+        icon: 'pi pi-fw pi-folder-open',
+      },
+      {
+        label: t('general.fileUpload'),
+        icon: 'pi pi-fw pi-upload',
+        command: async () => {
+          await onClickFileUpload();
+        },
+      },
+      {
+        label: t('general.folderDelete'),
+        icon: 'pi pi-fw pi-trash',
+        command: async () => {
+          await onClickFolderDelete();
+        },
+      },
+    ]);
+
+    /**
+     * Declaring reactive state.
+     */
+    const state = reactive({
+      loading: false,
+      expandedKeys: {} as StringKeyDictionary<boolean>,
+      selectionKeys: {} as StringKeyDictionary<boolean>,
+      breadcrumbHome: {
+        label: containerClient.containerName,
+        command: () => selectNode(''),
+      } as MenuItem,
+      breadcrumbItems: [] as MenuItem[],
+      nodes: [] as TreeNode[],
+      node: rootNode,
+      blobItems: [] as BlobItem[],
+      messages: '',
+      menuItems: items,
+    });
+
+    /**
+     * Build the tree and list the blob items.
+     */
+    const listBlobs = async (parentNode: TreeNode, reload: boolean) => {
+      if (!parentNode.children) {
+        return;
+      }
+
+      const prefix = parentNode.key;
+      state.blobItems.splice(0);
+
+      // If the tree has already been built, it will display the previously obtained contents.
+      if (!reload && parentNode.loaded) {
+        const len = parentNode.data.length;
+        for (let i = 0; i < len; i++) {
+          // The '.keep' file is a hidden file to build a virtual directory.
+          if (getFileName(parentNode.data[i].name) != '.keep') {
+            state.blobItems.push(parentNode.data[i]);
+          }
+        }
+        return;
+      }
+
+      if (reload) {
+        parentNode.loaded = false;
+        parentNode.children.splice(0);
+        parentNode.data.splice(0);
+      }
+
+      state.loading = true;
+      try {
+        state.messages += '[INFO] GET /' + prefix + '\n';
+        for await (const item of containerClient.listBlobsByHierarchy('/', { prefix: prefix })) {
+          if (item.kind === 'prefix') {
+            // BlobPrefix to build the tree.
+            let blobPrefix = item as BlobPrefix;
+            if (parentNode.children.find((value) => value.key == blobPrefix.name)) {
+              continue;
+            }
+            parentNode.children.push({
+              key: blobPrefix.name,
+              label: getFileName(blobPrefix.name.slice(0, -1)),
+              icon: 'pi pi-fw pi-folder',
+              children: [] as TreeNode[],
+              data: [] as BlobItem[],
+              leaf: false,
+              parent: parentNode,
+            });
+          } else {
+            // List the BlobItem in the table.
+            let blobItem = item as BlobItem;
+            // The '.keep' file is a hidden file to build a virtual directory.
+            if (getFileName(blobItem.name) != '.keep') {
+              state.blobItems.push(blobItem);
+            }
+            parentNode.data.push(blobItem);
+          }
+        }
+        parentNode.loaded = true;
+      } catch (error) {
+        state.messages += '[ERROR] ' + error.message + '\n';
+      }
+      state.loading = false;
+      scrollMessage();
+    };
+
+    /**
+     * Delete all SelectionKeys dictionary.
+     */
+    const deleteAllSelectionKeys = () => {
+      for (const key in state.selectionKeys) {
+        delete state.selectionKeys[key];
+      }
+    };
+
+    /**
+     * Scroll the contents of the text box to the bottom line.
+     */
+    const scrollMessage = () => {
+      if (messageRef.value) {
+        messageRef.value.scrollTop = messageRef.value.scrollHeight;
+      }
+    };
+
+    /**
+     * Search a node with the specified node key.
+     */
+    const searchNode = (node: TreeNode, nodeKey: string): TreeNode | null => {
+      if (node.key === nodeKey) {
+        return node;
+      }
+      if (node.children && node.children.length) {
+        for (const child of node.children) {
+          const result = searchNode(child, nodeKey);
+          if (result) {
+            return result;
+          }
+        }
+      }
+      return null;
+    };
+
+    /**
+     * Select a node with the specified node key.
+     */
+    const selectNode = async (nodeKey: string) => {
+      deleteAllSelectionKeys();
+      state.selectionKeys[nodeKey] = true;
+      const node = searchNode(rootNode, nodeKey);
+      if (node) {
+        await onNodeSelect(node);
+      }
+    };
+
+    /**
+     * Select a node with the specified node key.
+     */
+    const setBreadcrumb = (node: TreeNode) => {
+      state.breadcrumbItems.splice(0);
+      const items = node.key.slice(0, -1).split('/');
+      let nodePath = '';
+      const len = items.length;
+      for (let i = 0; i < len; i++) {
+        if (items[i]) {
+          nodePath += items[i] + '/';
+          const nodeKey = nodePath;
+          state.breadcrumbItems.push({
+            label: items[i],
+            command: async () => {
+              await selectNode(nodeKey);
+            },
+          });
+        }
+      }
+    };
+
+    /**
+     * Event handler when the refresh button is clicked.
+     */
+    const onClickRefresh = async () => {
+      await listBlobs(state.node, true);
+    };
+
+    /**
+     * Event handler when the file upload button is clicked.
+     */
+    const onClickFileUpload = async () => {
+      if (!fileUploadInputRef.value) {
+        return;
+      }
+      fileUploadInputRef.value.click();
+    };
+
+    /**
+     * Event handler when the folder delete button is clicked.
+     */
+    const onClickFolderDelete = async () => {
+      try {
+        state.messages += '[INFO] Preparing for delete...' + '\n';
+        const promises = [];
+        for (const blobItem of state.node.data) {
+          state.messages += '[INFO] Deleting /' + blobItem.name + '\n';
+          promises.push(containerClient.deleteBlob(blobItem.name));
+        }
+        await Promise.all(promises);
+        state.messages += '[INFO] Done.' + '\n';
+      } catch (error) {
+        state.messages += '[ERROR] ' + error.message + '\n';
+      }
+      scrollMessage();
+
+      if (state.node.parent) {
+        await listBlobs(state.node.parent, true);
+        await selectNode(state.node.parent.key);
+      } else {
+        await listBlobs(rootNode, true);
+        await selectNode(rootNode.key);
+      }
+    };
+
+    /**
+     * Event handler when the file upload input is changed.
+     */
+    const onChangeFileUploadInput = async () => {
+      if (!fileUploadInputRef.value) {
+        return;
+      }
+
+      if (!fileUploadInputRef.value.files) {
+        return;
+      }
+      try {
+        state.messages += '[INFO] Preparing for upload...' + '\n';
+        const promises = [];
+        for (const file of fileUploadInputRef.value.files) {
+          state.messages += '[INFO] Uploading /' + state.node.key + file.name + '\n';
+          const blockBlobClient = containerClient.getBlockBlobClient(state.node.key + file.name);
+          promises.push(blockBlobClient.uploadBrowserData(file));
+        }
+        await Promise.all(promises);
+        state.messages += '[INFO] Done.' + '\n';
+      } catch (error) {
+        state.messages += '[ERROR] ' + error.message + '\n';
+      }
+      scrollMessage();
+      await listBlobs(state.node, true);
+    };
+
+    /**
+     * Event handler when a node is selected or expanded.
+     */
+    const onNodeSelect = async (node: TreeNode) => {
+      await listBlobs(node, false);
+      state.node = node;
+      setBreadcrumb(node);
+      if (node.children && node.children.length > 0) {
+        state.expandedKeys[node.key] = true;
+      } else {
+        node.leaf = true;
+      }
+    };
+
+    /**
+     * Vue Lifecycle Hooks onMounted
+     */
+    onMounted(async () => {
+      await listBlobs(rootNode, false);
+      state.nodes.push(rootNode);
+      if (rootNode.children && rootNode.children.length > 0) {
+        state.expandedKeys[rootNode.key] = true;
+      }
+    });
+
+    return {
+      ...toRefs(state),
+      messageRef,
+      fileUploadInputRef,
+      convertToISO8601,
+      convertToISO8601Local,
+      formatBytes,
+      getFileName,
+      getFileIcon,
+      listBlobs,
+      onChangeFileUploadInput,
+      onNodeSelect,
+    };
+  },
+});
+</script>

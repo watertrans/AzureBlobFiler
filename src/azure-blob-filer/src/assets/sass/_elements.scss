@@ -1,0 +1,96 @@
+@import './_mixins';
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  height: 100%;
+  font-size: $fontSize;
+}
+
+body {
+  height: 100%;
+  padding: 0;
+  margin: 0;
+  font-size: $fontSize;
+  color: $textColor;
+  background-color: $bodyBgColor;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  @include font-gothic();
+}
+
+a {
+  color: #2196f3;
+  text-decoration: none;
+}
+
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+  margin: 1.5rem 0 1rem 0;
+  font-family: inherit;
+  font-weight: normal;
+  line-height: 1.2;
+  color: inherit;
+
+  &:first-child {
+    margin-top: 0;
+  }
+}
+
+h1 {
+  font-size: 1.5rem;
+}
+
+h2 {
+  font-size: 1.4rem;
+}
+
+h3 {
+  font-size: 1.3rem;
+}
+
+h4 {
+  font-size: 1.2rem;
+}
+
+h5 {
+  font-size: 1.1rem;
+}
+
+h6 {
+  font-size: 1.1rem;
+}
+
+mark {
+  padding: 0.25rem 0.4rem;
+  font-family: monospace;
+  background: #fff8e1;
+  border-radius: $borderRadius;
+}
+
+blockquote {
+  padding: 0 2rem;
+  margin: 1rem 0;
+  border-left: 4px solid #90a4ae;
+}
+
+hr {
+  margin: 1rem 0;
+  border-width: 1px 0 0 0;
+  border-top: solid $dividerColor;
+}
+
+p {
+  margin: 0 0 1rem 0;
+  line-height: 1.5;
+
+  &:last-child {
+    margin-bottom: 0;
+  }
+}

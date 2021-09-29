@@ -1,0 +1,66 @@
+.app {
+  height: 100vh;
+}
+
+.home {
+  height: 100vh;
+}
+
+.layout {
+  min-width: 768px;
+  height: 100%;
+}
+
+.layout-left {
+  min-width: 200px;
+  height: 100%;
+  &__tree {
+    height: 100%;
+    padding: 0.5rem;
+    border: 0;
+  }
+}
+
+.layout-right {
+  min-width: 564px;
+  height: 100%;
+}
+
+.layout-right__menu {
+  height: 51px;
+  border: 0;
+  border-bottom: 2px solid $dividerColor;
+  border-radius: 0;
+}
+
+.layout-right__breadcrumb {
+  height: 46px;
+  border: 0;
+  border-bottom: 2px solid $dividerColor;
+  border-radius: 0;
+}
+
+.layout-right__table {
+  height: calc(100vh - 250px);
+
+  .p-datatable-emptymessage {
+    td {
+      flex-grow: 1 !important;
+    }
+  }
+}
+
+.layout-right__message,
+.layout-right__message:focus {
+  display: block;
+  height: 150px;
+  padding: 7px;
+  font-family: Consolas, 'Courier New', Courier, Monaco, monospace;
+  line-height: 1.5em;
+  color: $textSecondaryColor;
+  resize: none;
+  border: 0;
+  border-top: 2px solid $dividerColor;
+  outline: none;
+  box-shadow: none;
+}
