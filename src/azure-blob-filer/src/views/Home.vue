@@ -126,6 +126,7 @@ export default defineComponent({
       breadcrumbItems: [] as MenuItem[],
       nodes: [] as TreeNode[],
       node: rootNode,
+      flattenedNodes: {} as StringKeyDictionary<TreeNode>,
       blobItems: [] as BlobItem[],
       messages: '',
       menuItems: items,
@@ -133,6 +134,8 @@ export default defineComponent({
       folderNameErrorMessage: '',
       isShowingCreateFolderDialog: false,
     });
+
+    state.flattenedNodes[rootNode.key] = rootNode;
 
     /**
      * Build the tree and list the blob items.
@@ -173,7 +176,7 @@ export default defineComponent({
             if (parentNode.children.find((value) => value.key == blobPrefix.name)) {
               continue;
             }
-            parentNode.children.push({
+            const node = {
               key: blobPrefix.name,
               label: getFileName(blobPrefix.name.slice(0, -1)),
               icon: 'pi pi-fw pi-folder',
@@ -181,7 +184,9 @@ export default defineComponent({
               data: [] as BlobItem[],
               leaf: false,
               parent: parentNode,
-            });
+            } as TreeNode;
+            parentNode.children.push(node);
+            state.flattenedNodes[node.key] = node;
           } else {
             // List the BlobItem in the table.
             let blobItem = item as BlobItem;
@@ -212,19 +217,8 @@ export default defineComponent({
     /**
      * Search a node with the specified node key.
      */
-    const searchNode = (node: TreeNode, nodeKey: string): TreeNode | null => {
-      if (node.key === nodeKey) {
-        return node;
-      }
-      if (node.children && node.children.length) {
-        for (const child of node.children) {
-          const result = searchNode(child, nodeKey);
-          if (result) {
-            return result;
-          }
-        }
-      }
-      return null;
+    const searchNode = (nodeKey: string): TreeNode | null => {
+      return state.flattenedNodes[nodeKey];
     };
 
     /**
@@ -257,7 +251,7 @@ export default defineComponent({
      * Select a node with the specified node key.
      */
     const selectNode = async (nodeKey: string) => {
-      const node = searchNode(rootNode, nodeKey);
+      const node = searchNode(nodeKey);
       if (node) {
         await onNodeSelect(node);
       }
@@ -271,7 +265,7 @@ export default defineComponent({
      * Refresh a node with the specified node key.
      */
     const refreshNode = async (nodeKey: string) => {
-      const node = searchNode(rootNode, nodeKey);
+      const node = searchNode(nodeKey);
       if (node) {
         contractNodeChildren(node.key);
         await listBlobs(node, true);
@@ -345,7 +339,7 @@ export default defineComponent({
       scrollMessage();
 
       if (state.node.children && !state.node.children.find((value) => value.key == key)) {
-        state.node.children.push({
+        const node = {
           key: key,
           label: getFileName(key.slice(0, -1)),
           icon: 'pi pi-fw pi-folder',
@@ -353,7 +347,9 @@ export default defineComponent({
           data: [] as BlobItem[],
           leaf: false,
           parent: state.node,
-        });
+        } as TreeNode;
+        state.node.children.push(node);
+        state.flattenedNodes[node.key] = node;
         expandNode(state.node.key);
       }
 
@@ -378,10 +374,18 @@ export default defineComponent({
       try {
         state.messages += '[INFO] Preparing for delete...' + '\n';
         const promises = [];
-        for (const blobItem of state.node.data) {
-          state.messages += '[INFO] Deleting /' + blobItem.name + '\n';
-          promises.push(containerClient.deleteBlob(blobItem.name));
+
+        for (const key in state.flattenedNodes) {
+          const node = state.flattenedNodes[key];
+          if (node.key.startsWith(state.node.key)) {
+            for (const blobItem of node.data) {
+              state.messages += '[INFO] Deleting /' + blobItem.name + '\n';
+              promises.push(containerClient.deleteBlob(blobItem.name));
+            }
+            delete state.flattenedNodes[key];
+          }
         }
+
         await Promise.all(promises);
         state.messages += '[INFO] Done.' + '\n';
       } catch (error) {
