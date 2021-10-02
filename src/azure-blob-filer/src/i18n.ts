@@ -30,6 +30,11 @@ const messages = {
       folderUpload: 'フォルダアップロード',
       fileUpload: 'ファイルアップロード',
       folderDelete: 'フォルダ削除',
+      folderName: 'フォルダ名',
+    },
+    message: {
+      required: "'{target}'を入力してください。",
+      illegalCharacter: "'{target}'に'{illegal}'を入力することはできません。",
     },
     toast: {
       errorSummary: 'エラー',

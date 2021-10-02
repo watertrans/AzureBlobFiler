@@ -34,6 +34,19 @@
         <input ref="fileUploadInputRef" type="file" name="file" id="fileUploadInput" @change="onChangeFileUploadInput" hidden multiple />
       </SplitterPanel>
     </Splitter>
+    <Dialog :header="t('general.createFolder')" v-model:visible="isShowingCreateFolderDialog" :style="{ width: '400px' }" :modal="true">
+      <div class="p-fluid">
+        <div class="field">
+          <label for="folderName" style="font-weight: bold">{{ t('general.folderName') }}</label>
+          <InputText id="folderName" v-model="folderName" :class="folderNameErrorMessage ? 'p-invalid' : ''" maxlength="254" autocomplete="off" />
+          <small id="folderNameHelp" v-if="folderNameErrorMessage" class="p-error">{{ folderNameErrorMessage }}</small>
+        </div>
+      </div>
+      <template #footer>
+        <Button label="Cancel" icon="pi pi-times" @click="isShowingCreateFolderDialog = false" class="p-button-text" />
+        <Button label="Submit" icon="pi pi-check" @click="onClickDialogCreateFolder" autofocus />
+      </template>
+    </Dialog>
   </div>
 </template>
 
@@ -75,6 +88,9 @@ export default defineComponent({
       {
         label: t('general.createFolder'),
         icon: 'pi pi-fw pi-folder',
+        command: async () => {
+          await onClickCreateFolder();
+        },
       },
       {
         label: t('general.folderUpload'),
@@ -113,6 +129,9 @@ export default defineComponent({
       blobItems: [] as BlobItem[],
       messages: '',
       menuItems: items,
+      folderName: '',
+      folderNameErrorMessage: '',
+      isShowingCreateFolderDialog: false,
     });
 
     /**
@@ -182,15 +201,6 @@ export default defineComponent({
     };
 
     /**
-     * Delete all SelectionKeys dictionary.
-     */
-    const deleteAllSelectionKeys = () => {
-      for (const key in state.selectionKeys) {
-        delete state.selectionKeys[key];
-      }
-    };
-
-    /**
      * Scroll the contents of the text box to the bottom line.
      */
     const scrollMessage = () => {
@@ -218,14 +228,54 @@ export default defineComponent({
     };
 
     /**
+     * Expand a node with the specified node key.
+     */
+    const expandNode = (nodeKey: string) => {
+      state.expandedKeys[nodeKey] = true;
+    };
+
+    /**
+     * Contract a node with the specified node key.
+     */
+    const contractNode = (nodeKey: string) => {
+      delete state.expandedKeys[nodeKey];
+    };
+
+    /**
+     * Contract all node children with the specified node key.
+     */
+    const contractNodeChildren = (nodeKey: string) => {
+      for (const key in state.expandedKeys) {
+        if (key.startsWith(nodeKey)) {
+          contractNode(key);
+        }
+      }
+      contractNode(nodeKey);
+    };
+
+    /**
      * Select a node with the specified node key.
      */
     const selectNode = async (nodeKey: string) => {
-      deleteAllSelectionKeys();
-      state.selectionKeys[nodeKey] = true;
       const node = searchNode(rootNode, nodeKey);
       if (node) {
         await onNodeSelect(node);
+      }
+      for (const key in state.selectionKeys) {
+        delete state.selectionKeys[key];
+      }
+      state.selectionKeys[nodeKey] = true;
+    };
+
+    /**
+     * Refresh a node with the specified node key.
+     */
+    const refreshNode = async (nodeKey: string) => {
+      const node = searchNode(rootNode, nodeKey);
+      if (node) {
+        contractNodeChildren(node.key);
+        await listBlobs(node, true);
+        await selectNode(node.key);
       }
     };
 
@@ -255,7 +305,60 @@ export default defineComponent({
      * Event handler when the refresh button is clicked.
      */
     const onClickRefresh = async () => {
-      await listBlobs(state.node, true);
+      await refreshNode(state.node.key);
+    };
+
+    /**
+     * Event handler when the create folder button is clicked.
+     */
+    const onClickCreateFolder = async () => {
+      state.folderName = '';
+      state.folderNameErrorMessage = '';
+      state.isShowingCreateFolderDialog = true;
+    };
+
+    /**
+     * Event handler when the create folder dialog button is clicked.
+     */
+    const onClickDialogCreateFolder = async () => {
+      if (!state.folderName) {
+        state.folderNameErrorMessage = t('message.required', { target: t('general.folderName') });
+        return;
+      }
+
+      if (state.folderName.includes('/')) {
+        state.folderNameErrorMessage = t('message.illegalCharacter', { target: t('general.folderName'), illegal: '/' });
+        return;
+      }
+
+      const key = state.node.key + state.folderName + '/';
+
+      try {
+        state.messages += '[INFO] Creating /' + state.folderName + '\n';
+        const blockBlobClient = containerClient.getBlockBlobClient(key + '.keep');
+        await blockBlobClient.uploadData(new ArrayBuffer(0));
+        state.messages += '[INFO] Done.' + '\n';
+      } catch (error) {
+        state.messages += '[ERROR] ' + error.message + '\n';
+      }
+
+      scrollMessage();
+
+      if (state.node.children && !state.node.children.find((value) => value.key == key)) {
+        state.node.children.push({
+          key: key,
+          label: getFileName(key.slice(0, -1)),
+          icon: 'pi pi-fw pi-folder',
+          children: [] as TreeNode[],
+          data: [] as BlobItem[],
+          leaf: false,
+          parent: state.node,
+        });
+        expandNode(state.node.key);
+      }
+
+      await selectNode(key);
+      state.isShowingCreateFolderDialog = false;
     };
 
     /**
@@ -287,9 +390,11 @@ export default defineComponent({
       scrollMessage();
 
       if (state.node.parent) {
+        contractNodeChildren(state.node.parent.key);
         await listBlobs(state.node.parent, true);
         await selectNode(state.node.parent.key);
       } else {
+        contractNodeChildren(rootNode.key);
         await listBlobs(rootNode, true);
         await selectNode(rootNode.key);
       }
@@ -331,7 +436,7 @@ export default defineComponent({
       state.node = node;
       setBreadcrumb(node);
       if (node.children && node.children.length > 0) {
-        state.expandedKeys[node.key] = true;
+        expandNode(node.key);
       } else {
         node.leaf = true;
       }
@@ -344,7 +449,7 @@ export default defineComponent({
       await listBlobs(rootNode, false);
       state.nodes.push(rootNode);
       if (rootNode.children && rootNode.children.length > 0) {
-        state.expandedKeys[rootNode.key] = true;
+        expandNode(rootNode.key);
       }
     });
 
@@ -359,7 +464,9 @@ export default defineComponent({
       getFileIcon,
       listBlobs,
       onChangeFileUploadInput,
+      onClickDialogCreateFolder,
       onNodeSelect,
+      t,
     };
   },
 });
