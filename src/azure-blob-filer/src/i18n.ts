@@ -26,6 +26,7 @@ const messages = {
     },
     general: {
       refresh: '更新',
+      cancel: 'キャンセル',
       createFolder: 'フォルダ作成',
       folderUpload: 'フォルダアップロード',
       fileUpload: 'ファイルアップロード',

@@ -43,8 +43,8 @@
         </div>
       </div>
       <template #footer>
-        <Button label="Cancel" icon="pi pi-times" @click="isShowingCreateFolderDialog = false" class="p-button-text" />
-        <Button label="Submit" icon="pi pi-check" @click="onClickDialogCreateFolder" autofocus />
+        <Button :label="t('general.cancel')" icon="pi pi-times" @click="isShowingCreateFolderDialog = false" class="p-button-text" />
+        <Button :label="t('general.createFolder')" icon="pi pi-check" @click="onClickDialogCreateFolder" autofocus />
       </template>
     </Dialog>
   </div>
@@ -55,7 +55,7 @@ import { defineComponent, reactive, ref, toRefs, onMounted } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { BlobItem, BlobPrefix, BlobServiceClient } from '@azure/storage-blob';
 import { TreeNode, MenuItem, StringKeyDictionary } from '@/modules/models';
-import { formatBytes, getFileIcon, getFileName, convertToISO8601, convertToISO8601Local } from '@/modules/utils';
+import { formatBytes, getFileIcon, getFileName, convertToISO8601, convertToISO8601Local, setFocus } from '@/modules/utils';
 
 export default defineComponent({
   name: 'Home',
@@ -309,6 +309,7 @@ export default defineComponent({
       state.folderName = '';
       state.folderNameErrorMessage = '';
       state.isShowingCreateFolderDialog = true;
+      setFocus('folderName');
     };
 
     /**

@@ -17,6 +17,15 @@ export function getFileExtension(path: string): string {
   return path.split('.').pop() as string;
 }
 
+export function setFocus(id: string): void {
+  setTimeout(() => {
+    const el = document.getElementById(id);
+    if (el) {
+      el.focus();
+    }
+  }, 200);
+}
+
 // prettier-ignore
 const iconSet = new Set<string>([
   'aac', 'ai', 'aiff', 'avi', 'bmp', 'c', 'cpp', 'css', 'csv', 'dat', 'dmg', 'doc', 'dotx',
