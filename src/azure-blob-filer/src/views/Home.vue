@@ -55,12 +55,8 @@
 import { defineComponent, reactive, ref, toRefs, onMounted, computed } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { BlobItem, BlobPrefix, BlobServiceClient } from '@azure/storage-blob';
-import { TreeNode, MenuItem, StringKeyDictionary } from '@/modules/models';
+import { TreeNode, MenuItem, StringKeyDictionary, WebkitFile } from '@/modules/models';
 import { formatBytes, getFileIcon, getFileName, convertToISO8601, convertToISO8601Local, setFocus } from '@/modules/utils';
-
-interface WebkitFile extends File {
-  webkitRelativePath: string;
-}
 
 export default defineComponent({
   name: 'Home',
@@ -381,6 +377,7 @@ export default defineComponent({
 
       scrollMessage();
 
+      // Skip processing if a node with the same name already exists.
       if (state.node.children && !state.node.children.find((value) => value.key == key)) {
         const node = {
           key: key,
@@ -446,6 +443,7 @@ export default defineComponent({
       }
       scrollMessage();
 
+      // Refresh the parent node.
       if (state.node.parent) {
         contractNodeChildren(state.node.parent.key);
         await listBlobs(state.node.parent, true);
@@ -476,6 +474,8 @@ export default defineComponent({
         state.messages += '[ERROR] ' + error.message + '\n';
       }
       scrollMessage();
+
+      // Refresh the current node.
       contractNodeChildren(state.node.key);
       await listBlobs(state.node, true);
       await selectNode(state.node.key);

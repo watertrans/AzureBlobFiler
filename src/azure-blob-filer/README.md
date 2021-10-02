@@ -1,4 +1,4 @@
-# azure-blob-control-panel
+# Azure Blob Filer
 
 ## Project setup
 ```

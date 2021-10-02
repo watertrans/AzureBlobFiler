@@ -40,3 +40,7 @@ export interface MenuItem {
 export interface StringKeyDictionary<T> {
   [index: string]: T;
 }
+
+export interface WebkitFile extends File {
+  webkitRelativePath: string;
+}
