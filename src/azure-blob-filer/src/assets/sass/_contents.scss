@@ -31,6 +31,11 @@
   border: 0;
   border-bottom: 2px solid $dividerColor;
   border-radius: 0;
+
+  .p-submenu-list {
+    z-index: 999;
+    width: 200px;
+  }
 }
 
 .layout-right__breadcrumb {

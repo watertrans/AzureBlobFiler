@@ -7,8 +7,9 @@
       <SplitterPanel class="layout-right" :size="80">
         <Menubar class="layout-right__menu" :model="menuItems" />
         <Breadcrumb class="layout-right__breadcrumb" :home="breadcrumbHome" :model="breadcrumbItems" />
-        <DataTable class="layout-right__table" :loading="loading" :scrollable="true" scrollHeight="calc(100vh - 250px)" :value="blobItems" :resizableColumns="true" columnResizeMode="fit" scrollDirection="both">
+        <DataTable class="layout-right__table" v-model:selection="selectedItems" dataKey="name" :loading="loading" :scrollable="true" scrollHeight="calc(100vh - 250px)" :value="blobItems" :resizableColumns="true" scrollDirection="both">
           <template #empty>&nbsp;</template>
+          <Column selectionMode="multiple" headerStyle="width: 3em"></Column>
           <Column field="name" header="Name" style="flex-basis: 400px">
             <template #body="slotProps">
               <span style="position: relative">
@@ -28,7 +29,6 @@
             </template>
           </Column>
           <Column field="properties.contentType" header="ContentType" style="flex-basis: 200px"></Column>
-          <Column field="properties.etag" header="ETag" style="flex-grow: 1"></Column>
         </DataTable>
         <textarea ref="messageRef" class="layout-right__message" v-model="messages" style="width: 100%" readonly></textarea>
         <input ref="fileUploadInputRef" type="file" name="file" id="fileUploadInput" @change="onChangeFileUploadInput" hidden multiple />
@@ -52,7 +52,7 @@
 </template>
 
 <script lang="ts">
-import { defineComponent, reactive, ref, toRefs, onMounted } from 'vue';
+import { defineComponent, reactive, ref, toRefs, onMounted, computed } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { BlobItem, BlobPrefix, BlobServiceClient } from '@azure/storage-blob';
 import { TreeNode, MenuItem, StringKeyDictionary } from '@/modules/models';
@@ -82,9 +82,9 @@ export default defineComponent({
       data: [] as BlobItem[],
       loaded: false,
     };
-
-    const items = ref([
+    const menuItems = [
       {
+        key: 'refresh',
         label: t('general.refresh'),
         icon: 'pi pi-fw pi-refresh',
         command: async () => {
@@ -92,6 +92,7 @@ export default defineComponent({
         },
       },
       {
+        key: 'createFolder',
         label: t('general.createFolder'),
         icon: 'pi pi-fw pi-folder',
         command: async () => {
@@ -99,27 +100,57 @@ export default defineComponent({
         },
       },
       {
-        label: t('general.folderUpload'),
-        icon: 'pi pi-fw pi-folder-open',
-        command: async () => {
-          await onClickFolderUpload();
-        },
-      },
-      {
-        label: t('general.fileUpload'),
+        key: 'upload',
+        label: t('general.upload'),
         icon: 'pi pi-fw pi-upload',
-        command: async () => {
-          await onClickFileUpload();
-        },
+        items: [
+          {
+            key: 'folderUpload',
+            label: t('general.folderUpload'),
+            icon: 'pi pi-fw pi-folder-open',
+            command: async () => {
+              await onClickFolderUpload();
+            },
+          },
+          {
+            key: 'fileUpload',
+            label: t('general.fileUpload'),
+            icon: 'pi pi-fw pi-copy',
+            command: async () => {
+              await onClickFileUpload();
+            },
+          },
+        ] as MenuItem[],
       },
       {
+        key: 'selectedItems',
+        label: computed(() => {
+          return t('general.selectedItems', { count: state.selectedItems.length });
+        }),
+        icon: 'pi pi-fw pi-ellipsis-h',
+        disabled: computed(() => {
+          return state.selectedItems.length == 0;
+        }),
+        items: [
+          {
+            key: 'fileDelete',
+            label: t('general.fileDelete'),
+            icon: 'pi pi-fw pi-file-excel',
+            command: async () => {
+              await onClickFileDelete();
+            },
+          },
+        ] as MenuItem[],
+      },
+      {
+        key: 'folderDelete',
         label: t('general.folderDelete'),
         icon: 'pi pi-fw pi-trash',
         command: async () => {
           await onClickFolderDelete();
         },
       },
-    ]);
+    ] as MenuItem[];
 
     /**
      * Declaring reactive state.
@@ -137,8 +168,9 @@ export default defineComponent({
       node: rootNode,
       flattenedNodes: {} as StringKeyDictionary<TreeNode>,
       blobItems: [] as BlobItem[],
+      selectedItems: [] as BlobItem[],
       messages: '',
-      menuItems: items,
+      menuItems: menuItems,
       folderName: '',
       folderNameErrorMessage: '',
       isShowingCreateFolderDialog: false,
@@ -155,7 +187,8 @@ export default defineComponent({
       }
 
       const prefix = parentNode.key;
-      state.blobItems.splice(0);
+      state.selectedItems = [] as BlobItem[];
+      state.blobItems = [] as BlobItem[];
 
       // If the tree has already been built, it will display the previously obtained contents.
       if (!reload && parentNode.loaded) {
@@ -422,6 +455,30 @@ export default defineComponent({
         await listBlobs(rootNode, true);
         await selectNode(rootNode.key);
       }
+    };
+
+    /**
+     * Event handler when the file delete button is clicked.
+     */
+    const onClickFileDelete = async () => {
+      try {
+        state.messages += '[INFO] Preparing for delete...' + '\n';
+        const promises = [];
+
+        for (const blobItem of state.selectedItems) {
+          state.messages += '[INFO] Deleting /' + blobItem.name + '\n';
+          promises.push(containerClient.deleteBlob(blobItem.name));
+        }
+
+        await Promise.all(promises);
+        state.messages += '[INFO] Done.' + '\n';
+      } catch (error) {
+        state.messages += '[ERROR] ' + error.message + '\n';
+      }
+      scrollMessage();
+      contractNodeChildren(state.node.key);
+      await listBlobs(state.node, true);
+      await selectNode(state.node.key);
     };
 
     /**

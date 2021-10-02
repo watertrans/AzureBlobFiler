@@ -27,11 +27,14 @@ const messages = {
     general: {
       refresh: '更新',
       cancel: 'キャンセル',
+      upload: 'アップロード',
       createFolder: 'フォルダ作成',
       folderUpload: 'フォルダアップロード',
       fileUpload: 'ファイルアップロード',
       folderDelete: 'フォルダ削除',
+      fileDelete: 'ファイル削除',
       folderName: 'フォルダ名',
+      selectedItems: 'アクション（{count}件）',
     },
     message: {
       required: "'{target}'を入力してください。",
