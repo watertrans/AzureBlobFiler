@@ -32,6 +32,7 @@
         </DataTable>
         <textarea ref="messageRef" class="layout-right__message" v-model="messages" style="width: 100%" readonly></textarea>
         <input ref="fileUploadInputRef" type="file" name="file" id="fileUploadInput" @change="onChangeFileUploadInput" hidden multiple />
+        <input ref="folderUploadInputRef" type="file" name="folder" id="folderUploadInput" @change="onChangeFolderUploadInput" hidden webkitdirectory />
       </SplitterPanel>
     </Splitter>
     <Dialog :header="t('general.createFolder')" v-model:visible="isShowingCreateFolderDialog" :style="{ width: '400px' }" :modal="true">
@@ -57,6 +58,10 @@ import { BlobItem, BlobPrefix, BlobServiceClient } from '@azure/storage-blob';
 import { TreeNode, MenuItem, StringKeyDictionary } from '@/modules/models';
 import { formatBytes, getFileIcon, getFileName, convertToISO8601, convertToISO8601Local, setFocus } from '@/modules/utils';
 
+interface WebkitFile extends File {
+  webkitRelativePath: string;
+}
+
 export default defineComponent({
   name: 'Home',
   components: {},
@@ -68,6 +73,7 @@ export default defineComponent({
     const containerClient = blobServiceClient.getContainerClient(containerName);
     const messageRef = ref<HTMLTextAreaElement>();
     const fileUploadInputRef = ref<HTMLInputElement>();
+    const folderUploadInputRef = ref<HTMLInputElement>();
     const rootNode: TreeNode = {
       key: '',
       label: containerClient.containerName,
@@ -95,6 +101,9 @@ export default defineComponent({
       {
         label: t('general.folderUpload'),
         icon: 'pi pi-fw pi-folder-open',
+        command: async () => {
+          await onClickFolderUpload();
+        },
       },
       {
         label: t('general.fileUpload'),
@@ -369,6 +378,16 @@ export default defineComponent({
     };
 
     /**
+     * Event handler when the folder upload button is clicked.
+     */
+    const onClickFolderUpload = async () => {
+      if (!folderUploadInputRef.value) {
+        return;
+      }
+      folderUploadInputRef.value.click();
+    };
+
+    /**
      * Event handler when the folder delete button is clicked.
      */
     const onClickFolderDelete = async () => {
@@ -431,6 +450,39 @@ export default defineComponent({
       }
       scrollMessage();
       await listBlobs(state.node, true);
+
+      fileUploadInputRef.value.value = '';
+    };
+
+    /**
+     * Event handler when the folder upload input is changed.
+     */
+    const onChangeFolderUploadInput = async () => {
+      if (!folderUploadInputRef.value) {
+        return;
+      }
+
+      if (!folderUploadInputRef.value.files) {
+        return;
+      }
+      try {
+        state.messages += '[INFO] Preparing for upload...' + '\n';
+        const promises = [];
+        for (const file of folderUploadInputRef.value.files) {
+          const webkitFile = file as WebkitFile;
+          state.messages += '[INFO] Uploading /' + state.node.key + webkitFile.webkitRelativePath + '\n';
+          const blockBlobClient = containerClient.getBlockBlobClient(state.node.key + webkitFile.webkitRelativePath);
+          promises.push(blockBlobClient.uploadBrowserData(file));
+        }
+        await Promise.all(promises);
+        state.messages += '[INFO] Done.' + '\n';
+      } catch (error) {
+        state.messages += '[ERROR] ' + error.message + '\n';
+      }
+      scrollMessage();
+      await refreshNode(state.node.key);
+
+      folderUploadInputRef.value.value = '';
     };
 
     /**
@@ -462,6 +514,7 @@ export default defineComponent({
       ...toRefs(state),
       messageRef,
       fileUploadInputRef,
+      folderUploadInputRef,
       convertToISO8601,
       convertToISO8601Local,
       formatBytes,
@@ -469,6 +522,7 @@ export default defineComponent({
       getFileIcon,
       listBlobs,
       onChangeFileUploadInput,
+      onChangeFolderUploadInput,
       onClickDialogCreateFolder,
       onNodeSelect,
       t,
