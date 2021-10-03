@@ -26,8 +26,11 @@ const messages = {
     },
     general: {
       refresh: '更新',
+      close: '閉じる',
       cancel: 'キャンセル',
       upload: 'アップロード',
+      uploading: 'アップロードしています...',
+      uploaded: 'アップロード完了',
       createFolder: 'フォルダ作成',
       folderUpload: 'フォルダアップロード',
       fileUpload: 'ファイルアップロード',

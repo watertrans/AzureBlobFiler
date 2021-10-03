@@ -3,3 +3,11 @@
 .p-component {
   @include font-gothic();
 }
+
+.p-dialog-content {
+  padding: 0 1.5rem !important;
+}
+
+.p-dialog-footer {
+  padding: 1rem 1.5rem 1.5rem 1.5rem !important;
+}

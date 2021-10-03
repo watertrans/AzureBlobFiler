@@ -45,7 +45,27 @@
       </div>
       <template #footer>
         <Button :label="t('general.cancel')" icon="pi pi-times" @click="isShowingCreateFolderDialog = false" class="p-button-text" />
-        <Button :label="t('general.createFolder')" icon="pi pi-check" @click="onClickDialogCreateFolder" autofocus />
+        <Button :label="t('general.createFolder')" icon="pi pi-check" @click="onClickDialogCreateFolder" class="mr-0" />
+      </template>
+    </Dialog>
+    <Dialog :header="isUploading ? t('general.uploading') : t('general.uploaded')" v-model:visible="isShowingUploadProgressDialog" :style="{ width: '768px', 'max-height': '80vh' }" :modal="true" :closable="false">
+      <div class="fluid" style="margin-bottom: 5px">
+        <ProgressBar :value="getUploadProgress()">
+          <div style="font-weight: normal; color: #fff; text-shadow: 1px 1px 0 #495057">{{ getUploadProgress() }}%</div>
+        </ProgressBar>
+      </div>
+      <FileUploadProgress
+        v-for="uploadFile of uploadFiles"
+        :key="uploadFile.key"
+        :keyValue="uploadFile.key"
+        :name="uploadFile.name"
+        :size="uploadFile.size"
+        :uploaded="uploadFile.uploaded"
+        @compelete="onCompeleteUpload"
+        @close="onCloseUploadProgress"
+      ></FileUploadProgress>
+      <template #footer>
+        <Button :label="t('general.close')" icon="pi pi-check" @click="isShowingUploadProgressDialog = false" class="mr-0" :disabled="isUploading" />
       </template>
     </Dialog>
   </div>
@@ -55,12 +75,16 @@
 import { defineComponent, reactive, ref, toRefs, onMounted, computed } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { BlobItem, BlobPrefix, BlobServiceClient } from '@azure/storage-blob';
+import { TransferProgressEvent } from '@azure/core-http';
 import { TreeNode, MenuItem, StringKeyDictionary, WebkitFile } from '@/modules/models';
 import { formatBytes, getFileIcon, getFileName, convertToISO8601, convertToISO8601Local, setFocus } from '@/modules/utils';
+import FileUploadProgress, { FileUploadItem } from '@/components/FileUploadProgress.vue';
 
 export default defineComponent({
   name: 'Home',
-  components: {},
+  components: {
+    FileUploadProgress,
+  },
   setup() {
     const { t } = useI18n();
     const blobSasUrl = process.env.VUE_APP_SAS_URL as string;
@@ -170,6 +194,11 @@ export default defineComponent({
       folderName: '',
       folderNameErrorMessage: '',
       isShowingCreateFolderDialog: false,
+      isShowingUploadProgressDialog: false,
+      isUploading: false,
+      uploadFiles: [] as FileUploadItem[],
+      uploadSize: 0,
+      uploadedSize: 0,
     });
 
     state.flattenedNodes[rootNode.key] = rootNode;
@@ -334,6 +363,16 @@ export default defineComponent({
     };
 
     /**
+     * Calculates and returns the size of the uploaded file.
+     */
+    const getUploadProgress = (): number => {
+      if (state.uploadSize == 0) {
+        return 0;
+      }
+      return Math.floor((state.uploadedSize / state.uploadSize) * 100);
+    };
+
+    /**
      * Event handler when the refresh button is clicked.
      */
     const onClickRefresh = async () => {
@@ -492,13 +531,34 @@ export default defineComponent({
       if (!fileUploadInputRef.value.files) {
         return;
       }
+
+      state.isShowingUploadProgressDialog = true;
+      state.uploadFiles = [] as FileUploadItem[];
+      state.uploadSize = 0;
+      state.uploadedSize = 0;
+      state.isUploading = true;
+
       try {
         state.messages += '[INFO] Preparing for upload...' + '\n';
         const promises = [];
         for (const file of fileUploadInputRef.value.files) {
           state.messages += '[INFO] Uploading /' + state.node.key + file.name + '\n';
           const blockBlobClient = containerClient.getBlockBlobClient(state.node.key + file.name);
-          promises.push(blockBlobClient.uploadBrowserData(file));
+          const fileUploadItem: FileUploadItem = reactive({
+            key: state.node.key + file.name,
+            name: file.name,
+            size: file.size,
+            uploaded: 0,
+          });
+          state.uploadSize += file.size;
+          state.uploadFiles.push(fileUploadItem);
+          promises.push(
+            blockBlobClient.uploadData(file, {
+              onProgress: (progress: TransferProgressEvent) => {
+                fileUploadItem.uploaded = progress.loadedBytes;
+              },
+            })
+          );
         }
         await Promise.all(promises);
         state.messages += '[INFO] Done.' + '\n';
@@ -507,7 +567,7 @@ export default defineComponent({
       }
       scrollMessage();
       await listBlobs(state.node, true);
-
+      state.isUploading = false;
       fileUploadInputRef.value.value = '';
     };
 
@@ -522,6 +582,13 @@ export default defineComponent({
       if (!folderUploadInputRef.value.files) {
         return;
       }
+
+      state.isShowingUploadProgressDialog = true;
+      state.uploadFiles = [] as FileUploadItem[];
+      state.uploadSize = 0;
+      state.uploadedSize = 0;
+      state.isUploading = true;
+
       try {
         state.messages += '[INFO] Preparing for upload...' + '\n';
         const promises = [];
@@ -529,7 +596,21 @@ export default defineComponent({
           const webkitFile = file as WebkitFile;
           state.messages += '[INFO] Uploading /' + state.node.key + webkitFile.webkitRelativePath + '\n';
           const blockBlobClient = containerClient.getBlockBlobClient(state.node.key + webkitFile.webkitRelativePath);
-          promises.push(blockBlobClient.uploadBrowserData(file));
+          const fileUploadItem: FileUploadItem = reactive({
+            key: state.node.key + webkitFile.webkitRelativePath,
+            name: file.name,
+            size: file.size,
+            uploaded: 0,
+          });
+          state.uploadSize += file.size;
+          state.uploadFiles.push(fileUploadItem);
+          promises.push(
+            blockBlobClient.uploadData(file, {
+              onProgress: (progress: TransferProgressEvent) => {
+                fileUploadItem.uploaded = progress.loadedBytes;
+              },
+            })
+          );
         }
         await Promise.all(promises);
         state.messages += '[INFO] Done.' + '\n';
@@ -538,8 +619,35 @@ export default defineComponent({
       }
       scrollMessage();
       await refreshNode(state.node.key);
-
+      state.isUploading = false;
       folderUploadInputRef.value.value = '';
+    };
+
+    /**
+     * Event handler when a blob item has been uploaded.
+     */
+    const onCompeleteUpload = (key: string, size: number) => {
+      state.uploadedSize += size;
+    };
+
+    /**
+     * Event handler when a blob item has been closed.
+     */
+    const onCloseUploadProgress = (key: string) => {
+      if (!state.uploadFiles) {
+        return;
+      }
+
+      let index = -1;
+      for (let i = 0; i < state.uploadFiles.length; i++) {
+        if (state.uploadFiles[i].key === key) {
+          index = i;
+          break;
+        }
+      }
+      if (index >= 0) {
+        state.uploadFiles.splice(index, 1);
+      }
     };
 
     /**
@@ -577,10 +685,13 @@ export default defineComponent({
       formatBytes,
       getFileName,
       getFileIcon,
+      getUploadProgress,
       listBlobs,
       onChangeFileUploadInput,
       onChangeFolderUploadInput,
       onClickDialogCreateFolder,
+      onCloseUploadProgress,
+      onCompeleteUpload,
       onNodeSelect,
       t,
     };
