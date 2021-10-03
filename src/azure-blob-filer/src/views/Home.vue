@@ -7,9 +7,20 @@
       <SplitterPanel class="layout-right" :size="80">
         <Menubar class="layout-right__menu" :model="menuItems" />
         <Breadcrumb class="layout-right__breadcrumb" :home="breadcrumbHome" :model="breadcrumbItems" />
-        <DataTable class="layout-right__table" v-model:selection="selectedItems" dataKey="name" :loading="loading" :scrollable="true" scrollHeight="calc(100vh - 250px)" :value="blobItems" :resizableColumns="true" scrollDirection="both">
+        <DataTable
+          class="layout-right__table"
+          v-model:selection="selectedItems"
+          dataKey="name"
+          :loading="loading"
+          :scrollable="true"
+          scrollHeight="calc(100vh - 250px)"
+          :value="blobItems"
+          :resizableColumns="true"
+          scrollDirection="both"
+          columnResizeMode="expand"
+        >
           <template #empty>&nbsp;</template>
-          <Column selectionMode="multiple" headerStyle="width: 3em"></Column>
+          <Column selectionMode="multiple" style="flex-basis: 42px"></Column>
           <Column field="name" header="Name" style="flex-basis: 400px">
             <template #body="slotProps">
               <span style="position: relative">
