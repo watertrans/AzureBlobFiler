@@ -4,6 +4,8 @@ This application is a filer for Blob containers created with Vue.js.
 Only Blob items inside a Blob container can be updated.  
 You need to have a SAS URL for the Azure Blob Container.  
 
+![CAPTURE.PNG](docs/img/capture.png)
+
 ## Features
 
 - Uploading files directly to the Azure Blob Container to be fast and efficient.
