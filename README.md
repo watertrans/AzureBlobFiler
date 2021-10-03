@@ -1,8 +1,16 @@
 # Azure Blob Filer
 
-This application is a serverless Azure Blob Filer that simplifies the functionality of Azure Storage Explorer.  
+This application is a filer for Blob containers created with Vue.js.  
 Only Blob items inside a Blob container can be updated.  
 You need to have a SAS URL for the Azure Blob Container.  
+
+## Features
+
+- Uploading files directly to the Azure Blob Container to be fast and efficient.
+- Not possible to add or remove the default Blob container.
+- Displays the contents of the Blob container in an explorer-like tree view.
+- Specify a folder to upload all files.
+- Specify multiple files to upload.
 
 ## Prerequisites
 
