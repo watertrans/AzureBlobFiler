@@ -36,7 +36,7 @@ const iconSet = new Set<string>([
 ]);
 
 export function getFileIcon(path: string): string {
-  const prefix = '/img/icon/file/';
+  const prefix = process.env.BASE_URL + 'img/icon/file/';
   const suffix = '.png';
   let ext = getFileExtension(path).toLowerCase();
   if (!iconSet.has(ext)) {
