@@ -40,7 +40,7 @@ export function getFileIcon(path: string): string {
   const suffix = '.png';
   let ext = getFileExtension(path).toLowerCase();
   if (!iconSet.has(ext)) {
-    ext = '_blank';
+    ext = 'blank';
   }
   return prefix + ext + suffix;
 }
