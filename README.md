@@ -31,12 +31,13 @@ You need to have a SAS URL for the Azure Blob Container.
 1. Create a Blob container of any name in Azure Portal.
 2. Generate SAS URL.
    ![SAS_URL.PNG](docs/img/sas_url.png)
-3. Set the SAS URL to VUE_APP_SAS_URL in the following file.
+3. Set the SAS URL to VUE_APP_SAS_URL in the following file. (Option)
     - ``\src\azure-blob-filer\.env.local``
       ```
-      VUE_APP_SAS_URL={ENTERTHE_BLOB_SAS_URL_HERE}
+      VUE_APP_SAS_URL={ENTER_THE_BLOB_SAS_URL_HERE}
       ```
     - Attention! Do not commit ``.env.local`` to Github.
+    - If VUE_APP_SAS_URL is not set, an input dialog will be displayed at startup.
 
 ## Setup CORS
 
