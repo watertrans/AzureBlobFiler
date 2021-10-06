@@ -89,3 +89,12 @@ export function convertToISO8601Local(date?: Date): string {
 export function padZero(number: number, maxLength = 2): string {
   return number.toString().padStart(maxLength, '0');
 }
+
+export function containsAll(target: string, characters: string): boolean {
+  for (let i = 0; i < characters.length; ++i) {
+    if (target.indexOf(characters.charAt(i)) < 0) {
+      return false;
+    }
+  }
+  return true;
+}

@@ -38,10 +38,16 @@ const messages = {
       fileDelete: 'ファイル削除',
       folderName: 'フォルダ名',
       selectedItems: 'アクション（{count}件）',
+      inputSasUrl: 'SAS URLを設定してください',
+      sasUrl: 'SAS URL',
+      submit: '設定',
     },
     message: {
       required: "'{target}'を入力してください。",
       illegalCharacter: "'{target}'に'{illegal}'を入力することはできません。",
+      unexpectedSignedResource: 'コンテナーに対するSAS URLを発行してください。',
+      unexpectedSignedPermissions: 'コンテナーに対するアクセス許可が足りません。',
+      invalidSasUrl: '指定したSAS URLは使用できません。',
     },
     toast: {
       errorSummary: 'エラー',

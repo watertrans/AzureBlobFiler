@@ -46,6 +46,18 @@
         <input ref="folderUploadInputRef" type="file" name="folder" id="folderUploadInput" @change="onChangeFolderUploadInput" hidden webkitdirectory />
       </SplitterPanel>
     </Splitter>
+    <Dialog :header="t('general.inputSasUrl')" v-model:visible="isShowingInputSasUrlDialog" :style="{ width: '600px' }" :modal="true" :closable="false">
+      <div class="p-fluid">
+        <div class="field">
+          <label for="sasUrl" style="font-weight: bold">{{ t('general.sasUrl') }}</label>
+          <InputText id="sasUrl" v-model="sasUrl" :class="sasUrlErrorMessage ? 'p-invalid' : ''" maxlength="512" autocomplete="off" />
+          <small id="sasUrlHelp" v-if="sasUrlErrorMessage" class="p-error">{{ sasUrlErrorMessage }}</small>
+        </div>
+      </div>
+      <template #footer>
+        <Button :label="t('general.submit')" icon="pi pi-check" @click="onClickDialogSubmitSasUrl" class="mr-0" />
+      </template>
+    </Dialog>
     <Dialog :header="t('general.createFolder')" v-model:visible="isShowingCreateFolderDialog" :style="{ width: '400px' }" :modal="true">
       <div class="p-fluid">
         <div class="field">
@@ -85,10 +97,12 @@
 <script lang="ts">
 import { defineComponent, reactive, ref, toRefs, onMounted, computed } from 'vue';
 import { useI18n } from 'vue-i18n';
-import { BlobItem, BlobPrefix, BlobServiceClient } from '@azure/storage-blob';
+import { BlobItem, BlobPrefix, BlobServiceClient, ContainerClient } from '@azure/storage-blob';
+import { escapeURLPath } from '@/modules/utils/utils.common';
+import { URLBuilder } from '@azure/core-http';
 import { TransferProgressEvent } from '@azure/core-http';
 import { TreeNode, MenuItem, StringKeyDictionary, WebkitFile } from '@/modules/models';
-import { formatBytes, getFileIcon, getFileName, convertToISO8601, convertToISO8601Local, setFocus } from '@/modules/utils';
+import { containsAll, formatBytes, getFileIcon, getFileName, convertToISO8601, convertToISO8601Local, setFocus } from '@/modules/utils';
 import FileUploadProgress, { FileUploadItem } from '@/components/FileUploadProgress.vue';
 
 export default defineComponent({
@@ -98,16 +112,12 @@ export default defineComponent({
   },
   setup() {
     const { t } = useI18n();
-    const blobSasUrl = process.env.VUE_APP_SAS_URL as string;
-    const blobServiceClient = new BlobServiceClient(blobSasUrl);
-    const containerName = '.';
-    const containerClient = blobServiceClient.getContainerClient(containerName);
     const messageRef = ref<HTMLTextAreaElement>();
     const fileUploadInputRef = ref<HTMLInputElement>();
     const folderUploadInputRef = ref<HTMLInputElement>();
     const rootNode: TreeNode = {
       key: '',
-      label: containerClient.containerName,
+      label: '',
       icon: 'pi pi-fw pi-inbox',
       children: [] as TreeNode[],
       data: [] as BlobItem[],
@@ -183,6 +193,11 @@ export default defineComponent({
       },
     ] as MenuItem[];
 
+    let blobSasUrl = process.env.VUE_APP_SAS_URL as string;
+    let blobServiceClient: BlobServiceClient;
+    let containerName = '.';
+    let containerClient: ContainerClient;
+
     /**
      * Declaring reactive state.
      */
@@ -191,7 +206,7 @@ export default defineComponent({
       expandedKeys: {} as StringKeyDictionary<boolean>,
       selectionKeys: {} as StringKeyDictionary<boolean>,
       breadcrumbHome: {
-        label: containerClient.containerName,
+        label: '',
         command: () => selectNode(''),
       } as MenuItem,
       breadcrumbItems: [] as MenuItem[],
@@ -204,8 +219,11 @@ export default defineComponent({
       menuItems: menuItems,
       folderName: '',
       folderNameErrorMessage: '',
+      sasUrl: '',
+      sasUrlErrorMessage: '',
       isShowingCreateFolderDialog: false,
       isShowingUploadProgressDialog: false,
+      isShowingInputSasUrlDialog: false,
       isUploading: false,
       uploadFiles: [] as FileUploadItem[],
       uploadSize: 0,
@@ -213,6 +231,23 @@ export default defineComponent({
     });
 
     state.flattenedNodes[rootNode.key] = rootNode;
+
+    /**
+     * Verifies the connection with the specified SAS URL.
+     */
+    const initBlobServiceClient = async () => {
+      blobServiceClient = new BlobServiceClient(blobSasUrl);
+      containerName = '.';
+      containerClient = blobServiceClient.getContainerClient(containerName);
+      await containerClient.listBlobsByHierarchy('/', { prefix: '__DUMMY__' }).next();
+      await listBlobs(rootNode, false);
+      state.nodes.push(rootNode);
+      state.breadcrumbHome.label = containerClient.containerName;
+      rootNode.label = containerClient.containerName;
+      if (rootNode.children && rootNode.children.length > 0) {
+        expandNode(rootNode.key);
+      }
+    };
 
     /**
      * Build the tree and list the blob items.
@@ -398,6 +433,46 @@ export default defineComponent({
       state.folderNameErrorMessage = '';
       state.isShowingCreateFolderDialog = true;
       setFocus('folderName');
+    };
+
+    /**
+     * Event handler when the SAS URL dialog button is clicked.
+     */
+    const onClickDialogSubmitSasUrl = async () => {
+      if (!state.sasUrl) {
+        state.sasUrlErrorMessage = t('message.required', { target: t('general.sasUrl') });
+        return;
+      }
+
+      const url = escapeURLPath(state.sasUrl);
+      const urlParsed = URLBuilder.parse(url);
+
+      if (urlParsed.getQueryParameterValue('sr') != 'c') {
+        state.sasUrlErrorMessage = t('message.unexpectedSignedResource');
+        return;
+      }
+
+      if (!urlParsed.getQueryParameterValue('sp')) {
+        state.sasUrlErrorMessage = t('message.unexpectedSignedPermissions');
+        return;
+      }
+
+      if (!containsAll(urlParsed.getQueryParameterValue('sp') as string, 'racwdl')) {
+        state.sasUrlErrorMessage = t('message.unexpectedSignedPermissions');
+        return;
+      }
+
+      blobSasUrl = state.sasUrl;
+
+      try {
+        await initBlobServiceClient();
+      } catch (error) {
+        console.log(error);
+        state.sasUrlErrorMessage = t('message.invalidSasUrl');
+        return;
+      }
+
+      state.isShowingInputSasUrlDialog = false;
     };
 
     /**
@@ -679,10 +754,15 @@ export default defineComponent({
      * Vue Lifecycle Hooks onMounted
      */
     onMounted(async () => {
-      await listBlobs(rootNode, false);
-      state.nodes.push(rootNode);
-      if (rootNode.children && rootNode.children.length > 0) {
-        expandNode(rootNode.key);
+      if (blobSasUrl.startsWith('{') && blobSasUrl.endsWith('}')) {
+        state.isShowingInputSasUrlDialog = true;
+      } else {
+        try {
+          await initBlobServiceClient();
+        } catch (error) {
+          console.log(error);
+          state.isShowingInputSasUrlDialog = true;
+        }
       }
     });
 
@@ -701,6 +781,7 @@ export default defineComponent({
       onChangeFileUploadInput,
       onChangeFolderUploadInput,
       onClickDialogCreateFolder,
+      onClickDialogSubmitSasUrl,
       onCloseUploadProgress,
       onCompeleteUpload,
       onNodeSelect,
