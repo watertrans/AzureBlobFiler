@@ -3,7 +3,12 @@
 This application is a filer for Blob containers created with Vue.js.  
 Only Blob items inside a Blob container can be updated.  
 You need to have a SAS URL for the Azure Blob Container.  
+Before your web application can access blob storage from the client, you must configure your account to enable cross-origin resource sharing, or CORS.  
 
+### Demo
+https://watertrans.github.io/AzureBlobFiler/
+
+### Screenshot
 ![CAPTURE.PNG](assets/img/capture.png)
 
 ## Features
