@@ -4,7 +4,7 @@ This application is a filer for Blob containers created with Vue.js.
 Only Blob items inside a Blob container can be updated.  
 You need to have a SAS URL for the Azure Blob Container.  
 
-![CAPTURE.PNG](docs/img/capture.png)
+![CAPTURE.PNG](assets/img/capture.png)
 
 ## Features
 
@@ -30,7 +30,7 @@ You need to have a SAS URL for the Azure Blob Container.
 
 1. Create a Blob container of any name in Azure Portal.
 2. Generate SAS URL.
-   ![SAS_URL.PNG](docs/img/sas_url.png)
+   ![SAS_URL.PNG](assets/img/sas_url.png)
 3. Set the SAS URL to VUE_APP_SAS_URL in the following file. (Option)
     - ``\src\azure-blob-filer\.env.local``
       ```
@@ -43,5 +43,5 @@ You need to have a SAS URL for the Azure Blob Container.
 
 1. Open the CORS configuration screen of the storage account where you created the Blob container.
 2. Set this according to the execution environment of the application. For more information, check out this [article](https://docs.microsoft.com/en-us/azure/storage/blobs/quickstart-blobs-javascript-browser#create-a-cors-rule).
-   ![CORS.PNG](docs/img/cors.png)
+   ![CORS.PNG](assets/img/cors.png)
 
