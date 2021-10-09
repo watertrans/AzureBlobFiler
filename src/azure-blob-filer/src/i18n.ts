@@ -1,29 +1,34 @@
 import { createI18n } from 'vue-i18n';
 
 const messages = {
-  ja: {
-    // PrimeVue Locale
-    primevueLocale: {
-      monthNamesJanuary: '1月',
-      monthNamesFebruary: '2月',
-      monthNamesMarch: '3月',
-      monthNamesApril: '4月',
-      monthNamesMay: '5月',
-      monthNamesJune: '6月',
-      monthNamesJuly: '7月',
-      monthNamesAugust: '8月',
-      monthNamesSeptember: '9月',
-      monthNamesOctober: '10月',
-      monthNamesNovember: '11月',
-      monthNamesDecember: '12月',
-      dayNamesMinSu: '日',
-      dayNamesMinMo: '月',
-      dayNamesMinTu: '火',
-      dayNamesMinWe: '水',
-      dayNamesMinTh: '木',
-      dayNamesMinFr: '金',
-      dayNamesMinSa: '土',
+  en: {
+    general: {
+      refresh: 'Refresh',
+      close: 'Close',
+      cancel: 'Cancel',
+      upload: 'Upload',
+      uploading: 'Uploading...',
+      uploaded: 'Uploaded',
+      createFolder: 'Create Folder',
+      folderUpload: 'Upload Folder',
+      fileUpload: 'Upload Files',
+      folderDelete: 'Delete Folder',
+      fileDelete: 'Delete Files',
+      folderName: 'Folder Name',
+      selectedItems: 'Action for {count} item(s)',
+      inputSasUrl: 'Input SAS URL',
+      sasUrl: 'SAS URL',
+      submit: 'Submit',
     },
+    message: {
+      required: "Enter '{target}'.",
+      illegalCharacter: "Not possible to enter '{illegal}' for '{target}'.",
+      unexpectedSignedResource: 'Please create a SAS URL for the container.',
+      unexpectedSignedPermissions: 'Do not have enough permissions for the container.',
+      invalidSasUrl: 'The specified SAS URL cannot be used.',
+    },
+  },
+  ja: {
     general: {
       refresh: '更新',
       close: '閉じる',
@@ -49,22 +54,12 @@ const messages = {
       unexpectedSignedPermissions: 'コンテナーに対するアクセス許可が足りません。',
       invalidSasUrl: '指定したSAS URLは使用できません。',
     },
-    toast: {
-      errorSummary: 'エラー',
-      errorDetail: 'エラーが発生しました。',
-      createdSummary: '登録完了',
-      createdDetail: '登録処理が完了しました。',
-      updatedSummary: '更新完了',
-      updatedDetail: '更新処理が完了しました。',
-      deletedSummary: '削除完了',
-      deletedDetail: '削除処理が完了しました。',
-    },
   },
 };
 
 const i18n = createI18n({
-  locale: 'ja',
-  fallbackLocale: 'ja',
+  locale: navigator.language.split('-')[0],
+  fallbackLocale: 'en',
   messages: messages,
 });
 
