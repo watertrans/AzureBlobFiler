@@ -19,6 +19,8 @@ const messages = {
       inputSasUrl: 'Input SAS URL',
       sasUrl: 'SAS URL',
       submit: 'Submit',
+      yes: 'Yes',
+      no: 'No',
     },
     message: {
       required: "Enter '{target}'.",
@@ -26,6 +28,8 @@ const messages = {
       unexpectedSignedResource: 'Please create a SAS URL for the container.',
       unexpectedSignedPermissions: 'Do not have enough permissions for the container.',
       invalidSasUrl: 'The specified SAS URL cannot be used.',
+      folderDeleteConfirmationMessage: 'Are you sure you want to delete current folder?',
+      fileDeleteConfirmationMessage: 'Are you sure you want to delete selected files?',
     },
   },
   ja: {
@@ -46,6 +50,8 @@ const messages = {
       inputSasUrl: 'SAS URLを設定してください',
       sasUrl: 'SAS URL',
       submit: '設定',
+      yes: 'はい',
+      no: 'いいえ',
     },
     message: {
       required: "'{target}'を入力してください。",
@@ -53,6 +59,8 @@ const messages = {
       unexpectedSignedResource: 'コンテナーに対するSAS URLを発行してください。',
       unexpectedSignedPermissions: 'コンテナーに対するアクセス許可が足りません。',
       invalidSasUrl: '指定したSAS URLは使用できません。',
+      folderDeleteConfirmationMessage: '現在のフォルダを削除してよろしいですか？',
+      fileDeleteConfirmationMessage: '選択したファイルを削除してもよろしいですか？',
     },
   },
 };

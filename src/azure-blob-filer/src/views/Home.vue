@@ -1,5 +1,6 @@
 <template>
   <div class="home">
+    <ConfirmDialog></ConfirmDialog>
     <Splitter class="layout" stateKey="directorySplitter" stateStorage="local">
       <SplitterPanel class="layout-left" :size="20">
         <Tree class="layout-left__tree" :value="nodes" v-model:expandedKeys="expandedKeys" v-model:selectionKeys="selectionKeys" @node-select="onNodeSelect" @node-expand="onNodeSelect" selectionMode="single"></Tree>
@@ -40,6 +41,7 @@
             </template>
           </Column>
           <Column field="properties.contentType" header="ContentType" style="flex-basis: 200px"></Column>
+          <Column style="flex-grow: 1"></Column>
         </DataTable>
         <textarea ref="messageRef" class="layout-right__message" v-model="messages" style="width: 100%" readonly></textarea>
         <input ref="fileUploadInputRef" type="file" name="file" id="fileUploadInput" @change="onChangeFileUploadInput" hidden multiple />
@@ -97,6 +99,7 @@
 <script lang="ts">
 import { defineComponent, reactive, ref, toRefs, onMounted, computed } from 'vue';
 import { useI18n } from 'vue-i18n';
+import { useConfirm } from 'primevue/useconfirm';
 import { BlobItem, BlobPrefix, BlobServiceClient, ContainerClient } from '@azure/storage-blob';
 import { escapeURLPath } from '@/modules/utils/utils.common';
 import { URLBuilder } from '@azure/core-http';
@@ -112,6 +115,7 @@ export default defineComponent({
   },
   setup() {
     const { t } = useI18n();
+    const confirm = useConfirm();
     const messageRef = ref<HTMLTextAreaElement>();
     const fileUploadInputRef = ref<HTMLInputElement>();
     const folderUploadInputRef = ref<HTMLInputElement>();
@@ -316,6 +320,70 @@ export default defineComponent({
       }
       state.loading = false;
       scrollMessage();
+    };
+
+    /**
+     * Delete the folder and all blob items in the folder.
+     */
+    const deleteFolder = async () => {
+      try {
+        state.messages += '[INFO] Preparing for delete...' + '\n';
+        const promises = [];
+
+        for (const key in state.flattenedNodes) {
+          const node = state.flattenedNodes[key];
+          if (node.key.startsWith(state.node.key)) {
+            for (const blobItem of node.data) {
+              state.messages += '[INFO] Deleting /' + blobItem.name + '\n';
+              promises.push(containerClient.deleteBlob(blobItem.name));
+            }
+            delete state.flattenedNodes[key];
+          }
+        }
+
+        await Promise.all(promises);
+        state.messages += '[INFO] Done.' + '\n';
+      } catch (error) {
+        state.messages += '[ERROR] ' + error.message + '\n';
+      }
+      scrollMessage();
+
+      // Refresh the parent node.
+      if (state.node.parent) {
+        contractNodeChildren(state.node.parent.key);
+        await listBlobs(state.node.parent, true);
+        await selectNode(state.node.parent.key);
+      } else {
+        contractNodeChildren(rootNode.key);
+        await listBlobs(rootNode, true);
+        await selectNode(rootNode.key);
+      }
+    };
+
+    /**
+     * Delete all selected blob items.
+     */
+    const deleteFiles = async () => {
+      try {
+        state.messages += '[INFO] Preparing for delete...' + '\n';
+        const promises = [];
+
+        for (const blobItem of state.selectedItems) {
+          state.messages += '[INFO] Deleting /' + blobItem.name + '\n';
+          promises.push(containerClient.deleteBlob(blobItem.name));
+        }
+
+        await Promise.all(promises);
+        state.messages += '[INFO] Done.' + '\n';
+      } catch (error) {
+        state.messages += '[ERROR] ' + error.message + '\n';
+      }
+      scrollMessage();
+
+      // Refresh the current node.
+      contractNodeChildren(state.node.key);
+      await listBlobs(state.node, true);
+      await selectNode(state.node.key);
     };
 
     /**
@@ -546,64 +614,32 @@ export default defineComponent({
      * Event handler when the folder delete button is clicked.
      */
     const onClickFolderDelete = async () => {
-      try {
-        state.messages += '[INFO] Preparing for delete...' + '\n';
-        const promises = [];
-
-        for (const key in state.flattenedNodes) {
-          const node = state.flattenedNodes[key];
-          if (node.key.startsWith(state.node.key)) {
-            for (const blobItem of node.data) {
-              state.messages += '[INFO] Deleting /' + blobItem.name + '\n';
-              promises.push(containerClient.deleteBlob(blobItem.name));
-            }
-            delete state.flattenedNodes[key];
-          }
-        }
-
-        await Promise.all(promises);
-        state.messages += '[INFO] Done.' + '\n';
-      } catch (error) {
-        state.messages += '[ERROR] ' + error.message + '\n';
-      }
-      scrollMessage();
-
-      // Refresh the parent node.
-      if (state.node.parent) {
-        contractNodeChildren(state.node.parent.key);
-        await listBlobs(state.node.parent, true);
-        await selectNode(state.node.parent.key);
-      } else {
-        contractNodeChildren(rootNode.key);
-        await listBlobs(rootNode, true);
-        await selectNode(rootNode.key);
-      }
+      confirm.require({
+        message: t('message.folderDeleteConfirmationMessage'),
+        header: t('general.folderDelete'),
+        icon: 'pi pi-exclamation-triangle',
+        acceptLabel: t('general.yes'),
+        rejectLabel: t('general.no'),
+        accept: async () => {
+          await deleteFolder();
+        },
+      });
     };
 
     /**
      * Event handler when the file delete button is clicked.
      */
     const onClickFileDelete = async () => {
-      try {
-        state.messages += '[INFO] Preparing for delete...' + '\n';
-        const promises = [];
-
-        for (const blobItem of state.selectedItems) {
-          state.messages += '[INFO] Deleting /' + blobItem.name + '\n';
-          promises.push(containerClient.deleteBlob(blobItem.name));
-        }
-
-        await Promise.all(promises);
-        state.messages += '[INFO] Done.' + '\n';
-      } catch (error) {
-        state.messages += '[ERROR] ' + error.message + '\n';
-      }
-      scrollMessage();
-
-      // Refresh the current node.
-      contractNodeChildren(state.node.key);
-      await listBlobs(state.node, true);
-      await selectNode(state.node.key);
+      confirm.require({
+        message: t('message.fileDeleteConfirmationMessage'),
+        header: t('general.fileDelete'),
+        icon: 'pi pi-exclamation-triangle',
+        acceptLabel: t('general.yes'),
+        rejectLabel: t('general.no'),
+        accept: async () => {
+          await deleteFiles();
+        },
+      });
     };
 
     /**
