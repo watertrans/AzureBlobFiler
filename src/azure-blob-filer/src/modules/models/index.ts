@@ -44,3 +44,9 @@ export interface StringKeyDictionary<T> {
 export interface WebkitFile extends File {
   webkitRelativePath: string;
 }
+
+export interface ZipItem {
+  name: string;
+  content: ArrayBuffer;
+  size: number;
+}

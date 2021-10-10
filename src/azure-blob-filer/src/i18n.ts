@@ -2,6 +2,9 @@ import { createI18n } from 'vue-i18n';
 
 const messages = {
   en: {
+    setting: {
+      zipFilenameDecoding: 'utf-8',
+    },
     general: {
       refresh: 'Refresh',
       close: 'Close',
@@ -12,6 +15,7 @@ const messages = {
       createFolder: 'Create Folder',
       folderUpload: 'Upload Folder',
       fileUpload: 'Upload Files',
+      zipFileUpload: 'Upload Zip File',
       folderDelete: 'Delete Folder',
       fileDelete: 'Delete Files',
       folderName: 'Folder Name',
@@ -33,6 +37,9 @@ const messages = {
     },
   },
   ja: {
+    setting: {
+      zipFilenameDecoding: 'Shift_JIS',
+    },
     general: {
       refresh: '更新',
       close: '閉じる',
@@ -43,6 +50,7 @@ const messages = {
       createFolder: 'フォルダ作成',
       folderUpload: 'フォルダアップロード',
       fileUpload: 'ファイルアップロード',
+      zipFileUpload: 'ZIPファイルアップロード',
       folderDelete: 'フォルダ削除',
       fileDelete: 'ファイル削除',
       folderName: 'フォルダ名',

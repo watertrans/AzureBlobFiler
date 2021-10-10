@@ -45,6 +45,7 @@
         </DataTable>
         <textarea ref="messageRef" class="layout-right__message" v-model="messages" style="width: 100%" readonly></textarea>
         <input ref="fileUploadInputRef" type="file" name="file" id="fileUploadInput" @change="onChangeFileUploadInput" hidden multiple />
+        <input ref="zipFileUploadInputRef" type="file" name="zipFile" id="zipFileUploadInput" @change="onChangeZipFileUploadInput" accept=".zip" hidden />
         <input ref="folderUploadInputRef" type="file" name="folder" id="folderUploadInput" @change="onChangeFolderUploadInput" hidden webkitdirectory />
       </SplitterPanel>
     </Splitter>
@@ -100,12 +101,13 @@
 import { defineComponent, reactive, ref, toRefs, onMounted, computed } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { useConfirm } from 'primevue/useconfirm';
-import { BlobItem, BlobPrefix, BlobServiceClient, ContainerClient } from '@azure/storage-blob';
+import { BlobItem, BlobPrefix, BlobServiceClient, BlobUploadCommonResponse, ContainerClient } from '@azure/storage-blob';
 import { escapeURLPath } from '@/modules/utils/utils.common';
 import { URLBuilder } from '@azure/core-http';
 import { TransferProgressEvent } from '@azure/core-http';
-import { TreeNode, MenuItem, StringKeyDictionary, WebkitFile } from '@/modules/models';
+import { TreeNode, MenuItem, StringKeyDictionary, WebkitFile, ZipItem } from '@/modules/models';
 import { containsAll, formatBytes, getFileIcon, getFileName, convertToISO8601, convertToISO8601Local, setFocus } from '@/modules/utils';
+import JSZip from 'jszip';
 import FileUploadProgress, { FileUploadItem } from '@/components/FileUploadProgress.vue';
 
 export default defineComponent({
@@ -118,6 +120,7 @@ export default defineComponent({
     const confirm = useConfirm();
     const messageRef = ref<HTMLTextAreaElement>();
     const fileUploadInputRef = ref<HTMLInputElement>();
+    const zipFileUploadInputRef = ref<HTMLInputElement>();
     const folderUploadInputRef = ref<HTMLInputElement>();
     const rootNode: TreeNode = {
       key: '',
@@ -163,6 +166,14 @@ export default defineComponent({
             icon: 'pi pi-fw pi-copy',
             command: async () => {
               await onClickFileUpload();
+            },
+          },
+          {
+            key: 'zipFileUpload',
+            label: t('general.zipFileUpload'),
+            icon: 'pi pi-fw pi-sitemap',
+            command: async () => {
+              await onClickZipFileUpload();
             },
           },
         ] as MenuItem[],
@@ -384,6 +395,70 @@ export default defineComponent({
       contractNodeChildren(state.node.key);
       await listBlobs(state.node, true);
       await selectNode(state.node.key);
+    };
+
+    /**
+     * Load the ZIP file.
+     */
+    const loadZip = async (zip: JSZip) => {
+      const items = [] as ZipItem[];
+      const itemCount = Object.keys(zip.files).length;
+      let count = 0;
+      zip.forEach(async (relativePath, zipEntry) => {
+        const content = await zipEntry.async('arraybuffer');
+        if (!zipEntry.name.endsWith('/')) {
+          items.push({ name: zipEntry.name, content: content, size: content.byteLength });
+        }
+        count++;
+        if (itemCount == count) {
+          await callbackZipLoaded(items);
+        }
+      });
+    };
+
+    /**
+     * Callback when a ZIP file is loaded.
+     */
+    const callbackZipLoaded = async (items: ZipItem[]) => {
+      state.isShowingUploadProgressDialog = true;
+      state.uploadFiles = [] as FileUploadItem[];
+      state.uploadSize = 0;
+      state.uploadedSize = 0;
+      state.isUploading = true;
+
+      try {
+        state.messages += '[INFO] Preparing for upload...' + '\n';
+        const promises = [] as Promise<BlobUploadCommonResponse>[];
+        for (const item of items) {
+          state.messages += '[INFO] Uploading /' + state.node.key + item.name + '\n';
+          const blockBlobClient = containerClient.getBlockBlobClient(state.node.key + item.name);
+          const fileUploadItem: FileUploadItem = reactive({
+            key: state.node.key + item.name,
+            name: item.name,
+            size: item.size,
+            uploaded: 0,
+          });
+          state.uploadSize += item.size;
+          state.uploadFiles.push(fileUploadItem);
+          promises.push(
+            blockBlobClient.uploadData(item.content, {
+              onProgress: (progress: TransferProgressEvent) => {
+                fileUploadItem.uploaded = progress.loadedBytes;
+              },
+            })
+          );
+        }
+        await Promise.all(promises);
+        state.messages += '[INFO] Done.' + '\n';
+      } catch (error) {
+        state.messages += '[ERROR] ' + error.message + '\n';
+      }
+      scrollMessage();
+      await listBlobs(state.node, true);
+      state.isUploading = false;
+      if (zipFileUploadInputRef.value) {
+        zipFileUploadInputRef.value.value = '';
+      }
     };
 
     /**
@@ -611,6 +686,16 @@ export default defineComponent({
     };
 
     /**
+     * Event handler when the zip file upload button is clicked.
+     */
+    const onClickZipFileUpload = async () => {
+      if (!zipFileUploadInputRef.value) {
+        return;
+      }
+      zipFileUploadInputRef.value.click();
+    };
+
+    /**
      * Event handler when the folder delete button is clicked.
      */
     const onClickFolderDelete = async () => {
@@ -691,6 +776,34 @@ export default defineComponent({
       await listBlobs(state.node, true);
       state.isUploading = false;
       fileUploadInputRef.value.value = '';
+    };
+
+    /**
+     * Event handler when the zip file upload input is changed.
+     */
+    const onChangeZipFileUploadInput = async () => {
+      if (!zipFileUploadInputRef.value) {
+        return;
+      }
+
+      if (!zipFileUploadInputRef.value.files) {
+        return;
+      }
+
+      const file = zipFileUploadInputRef.value.files[0];
+
+      try {
+        const decoder = new TextDecoder(t('setting.zipFilenameDecoding'));
+        const zip = await JSZip.loadAsync(file, {
+          // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+          // @ts-ignore
+          decodeFileName: (fileNameBinary) => decoder.decode(fileNameBinary),
+        });
+        await loadZip(zip);
+      } catch (error) {
+        state.messages += '[ERROR] ' + error.message + '\n';
+        scrollMessage();
+      }
     };
 
     /**
@@ -806,6 +919,7 @@ export default defineComponent({
       ...toRefs(state),
       messageRef,
       fileUploadInputRef,
+      zipFileUploadInputRef,
       folderUploadInputRef,
       convertToISO8601,
       convertToISO8601Local,
@@ -815,6 +929,7 @@ export default defineComponent({
       getUploadProgress,
       listBlobs,
       onChangeFileUploadInput,
+      onChangeZipFileUploadInput,
       onChangeFolderUploadInput,
       onClickDialogCreateFolder,
       onClickDialogSubmitSasUrl,

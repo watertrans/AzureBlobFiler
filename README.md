@@ -18,6 +18,14 @@ https://watertrans.github.io/AzureBlobFiler/
 - Displays the contents of the Blob container in an explorer-like tree view.
 - Specify a folder to upload all files.
 - Specify multiple files to upload.
+- Unzip the specified ZIP file and upload it.
+
+## Limitations
+
+- There is no function to display the contents of the file.
+- There is no function to move files.
+- To create that folder, we will generate a hidden file called ".keep".
+- It has been tested with the latest versions of Chrome, FireFox, and Edge.
 
 ## Prerequisites
 
