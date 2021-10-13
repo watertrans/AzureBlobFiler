@@ -39,7 +39,15 @@ https://watertrans.github.io/AzureBlobFiler/
   - Vetur - Pine Wu
   - stylelint - stylelint
 
-## Setup SAS URL
+## Setup Azure Blob Storage
+
+### CORS
+
+1. Open the CORS configuration screen of the storage account where you created the Blob container.
+2. Set this according to the execution environment of the application. For more information, check out this [article](https://docs.microsoft.com/en-us/azure/storage/blobs/quickstart-blobs-javascript-browser#create-a-cors-rule).
+   ![CORS.PNG](assets/img/cors.png)
+
+### SAS URL
 
 1. Create a Blob container of any name in Azure Portal.
 2. Generate SAS URL.
@@ -52,9 +60,50 @@ https://watertrans.github.io/AzureBlobFiler/
     - Attention! Do not commit ``.env.local`` to Github.
     - If VUE_APP_SAS_URL is not set, an input dialog will be displayed at startup.
 
-## Setup CORS
+## Setup Azurite (free local environment for testing)
 
-1. Open the CORS configuration screen of the storage account where you created the Blob container.
-2. Set this according to the execution environment of the application. For more information, check out this [article](https://docs.microsoft.com/en-us/azure/storage/blobs/quickstart-blobs-javascript-browser#create-a-cors-rule).
-   ![CORS.PNG](assets/img/cors.png)
+### Docker Compose
 
+By default, Azurite applies strict mode to block unsupported request headers and parameters.  
+Use the Loose mode. (azurite --loose)
+
+```
+version: '3.8'
+services:
+  db:
+    image: mcr.microsoft.com/azure-storage/azurite
+    container_name: azurite
+    restart: always
+    volumes: 
+      - ./data:/data
+    ports:
+      - 10000:10000
+      - 10001:10001
+      - 10002:10002
+    command: azurite --blobHost 0.0.0.0 --blobPort 10000 --queueHost 0.0.0.0 --queuePort 10001 --tableHost 0.0.0.0 --tablePort 10002 --loose
+```
+
+### CORS
+
+1. Use Microsoft Azure Storage Explorer to connect to Azurite.
+2. Right-click on Blob Containers and select "Configure CORS Settings...".
+  ![CORS_AZURITE_1.PNG](assets/img/cors_azurite_1.png)
+3. Set this according to the execution environment of the application. For more information, check out this [article](https://docs.microsoft.com/en-us/azure/storage/blobs/quickstart-blobs-javascript-browser#create-a-cors-rule).
+  ![CORS_AZURITE_2.PNG](assets/img/cors_azurite_2.png)
+
+### SAS URL
+
+1. Create a Blob container of any name.  
+2. Right-click on created blob container and select "Get Shared Access  Signature...".
+  ![SAS_URL_AZURITE_1.PNG](assets/img/sas_url_azurite_1.png)
+3. For permissions, choice Read, Add, Create, Write, Delete, and List.  
+  ![SAS_URL_AZURITE_2.PNG](assets/img/sas_url_azurite_2.png)
+4. Keep the URL field.  
+  ![SAS_URL_AZURITE_3.PNG](assets/img/sas_url_azurite_3.png)
+5. Set the SAS URL to VUE_APP_SAS_URL in the following file. (Option)
+    - ``\src\azure-blob-filer\.env.local``
+      ```
+      VUE_APP_SAS_URL={ENTER_THE_BLOB_SAS_URL_HERE}
+      ```
+    - Attention! Do not commit ``.env.local`` to Github.
+    - If VUE_APP_SAS_URL is not set, an input dialog will be displayed at startup.
