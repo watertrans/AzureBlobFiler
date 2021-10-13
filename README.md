@@ -107,3 +107,15 @@ services:
       ```
     - Attention! Do not commit ``.env.local`` to Github.
     - If VUE_APP_SAS_URL is not set, an input dialog will be displayed at startup.
+
+## Passing SAS URL using URL QueryString
+
+You can quickly access the Blob container by setting up a 'sas' query string.  
+Please refer to the following.  
+
+```
+<a href="https://watertrans.github.io/AzureBlobFiler/?sas=http%3A//127.0.0.1%3A10000/devstoreaccount1/files%3Fsv%3D2018-03-28%26st%3D2021-01-01T00%253A00%253A00Z%26se%3D2021-12-31T23%253A59%253A00Z%26sr%3Dc%26sp%3Dracwdl%26sig%3DAKGXHmtHoeKOJ9BTQpNeJKpvdfJhGIAqZh2JEN0m0pU%253D">Explore</a>
+```
+
+Create a server-side application that dynamically publishes IP-restricted, short-lived SAS URL.  
+It can be reused as a tool that can be integrated into a variety of applications.  

@@ -99,6 +99,7 @@
 
 <script lang="ts">
 import { defineComponent, reactive, ref, toRefs, onMounted, computed } from 'vue';
+import { useRoute } from 'vue-router';
 import { useI18n } from 'vue-i18n';
 import { useConfirm } from 'primevue/useconfirm';
 import { BlobItem, BlobPrefix, BlobServiceClient, BlobUploadCommonResponse, ContainerClient } from '@azure/storage-blob';
@@ -117,6 +118,7 @@ export default defineComponent({
   },
   setup() {
     const { t } = useI18n();
+    const route = useRoute();
     const confirm = useConfirm();
     const messageRef = ref<HTMLTextAreaElement>();
     const fileUploadInputRef = ref<HTMLInputElement>();
@@ -903,6 +905,10 @@ export default defineComponent({
      * Vue Lifecycle Hooks onMounted
      */
     onMounted(async () => {
+      if (route.query && route.query.sas) {
+        blobSasUrl = route.query.sas.toString();
+      }
+
       if (blobSasUrl.startsWith('{') && blobSasUrl.endsWith('}')) {
         state.isShowingInputSasUrlDialog = true;
       } else {
